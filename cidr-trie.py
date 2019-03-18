@@ -30,7 +30,7 @@ class Node:
     value = None
 
 
-class RadixTrie:
+class BinaryTree:
     root = Node()
 
     def insert(self, prefix, value):
@@ -44,14 +44,14 @@ class RadixTrie:
         while count < netmask:
             val = ip & cur_bit
 
-            # traverse the trie
+            # traverse the tree
             if val != 0:
-                # right subtrie
+                # right subtree
                 if cur_node.right is None:
                     cur_node.right = Node()
                 cur_node = cur_node.right
             else:
-                # left subtrie
+                # left subtree
                 if cur_node.left is None:
                     cur_node.left = Node()
                 cur_node = cur_node.left
@@ -83,10 +83,82 @@ class RadixTrie:
 
         return values
 
+def first_set_bit(b):
+    # TODO: change for 128 bits of IPv6
+    # gradually set all bits right of MSB
+    n = b | b >> 1
+    n |= n >> 2
+    n |= n >> 4
+    n |= n >> 8
+    n |= n >> 16
+
+    # increment diff by one so that there's only
+    # one set bit which is just before original MSB
+    n += 1
+
+    # shift it so it's in the original position
+    n >>= 1
+
+    # figure out the ordinal of the bit from LSB
+    pos = 0
+    while (n & 1) == 0:
+        n >>= 1
+        pos += 1
+    return pos
+
+def longest_common_prefix(a, b):
+    diff = a ^ b # binary difference
+    first_bit = first_set_bit(diff)
+    return a >> (first_bit + 1)
+    
+
+class PatriciaNode:
+    left = None
+    right = None
+    skip = None
+    value = None
+
+class PatriciaTrie:
+    root = PatriciaNode()
+
+    def insert(self, prefix, value):
+        cur_bit = 0x80000000  # the MSB of the IP
+        cur_node = self.root
+        count = 0
+
+        (ip, netmask) = cidrToIpAndNetmask(prefix)
+
+        # while we're within the mask
+        while count < netmask:
+            val = ip & cur_bit
+
+            # traverse the trie
+            if val != 0:
+                # right subtrie
+                if cur_node.right is None:
+                    cur_node.right = Node()
+                cur_node = cur_node.right
+            else:
+                # left subtrie
+                if cur_node.left is None:
+                    cur_node.left = Node()
+                cur_node = cur_node.left
+
+            count += 1
+            cur_bit >>= 1
+
+        cur_node.value = value
+        print("Inserted at level {}".format(count))
 
 if __name__ == "__main__":
-    trie = RadixTrie()
-    trie.insert("0.0.0.0/0", 1234)
-    trie.insert("192.168.0.1/24", 1235)
-    trie.insert("192.168.0.128", 1236)
-    print(trie.find("192.168.0.128"))
+    #tree = BinaryTree()
+    #tree.insert("0.0.0.0/0", 1234)
+    #tree.insert("192.168.0.1/24", 1235)
+    #tree.insert("192.168.0.128", 1236)
+    #print(tree.find("192.168.0.128"))
+
+    a = 0b10001101
+    b = 0b10011111
+    print(f"{a:b}")
+    print(f"{b:b}")
+    print(f"{longest_common_prefix(a, b):b}")
