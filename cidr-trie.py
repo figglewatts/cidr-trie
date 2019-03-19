@@ -106,6 +106,9 @@ def first_set_bit(b):
         pos += 1
     return pos
 
+def longest_common_prefix_length(a, b):
+    return 32 - first_set_bit(a ^ b) - 1
+
 def longest_common_prefix(a, b):
     diff = a ^ b # binary difference
     first_bit = first_set_bit(diff)
@@ -116,39 +119,54 @@ class PatriciaNode:
     left = None
     right = None
     skip = None
+    ip = 0
     value = None
 
 class PatriciaTrie:
-    root = PatriciaNode()
+    root = None
 
     def insert(self, prefix, value):
         cur_bit = 0x80000000  # the MSB of the IP
         cur_node = self.root
-        count = 0
+        cur_skip = 0
 
         (ip, netmask) = cidrToIpAndNetmask(prefix)
 
+        if cur_node is None:
+            cur_node = PatriciaNode()
+
         # while we're within the mask
-        while count < netmask:
+        while cur_skip < netmask:
+            # insert if we get to a null node
+            if cur_node is None:
+                break
+            
+            lcp_len = longest_common_prefix_length(cur_node.ip, ip)
+            cur_bit >>= lcp_len
+            cur_skip += lcp_len
             val = ip & cur_bit
 
             # traverse the trie
             if val != 0:
                 # right subtrie
+                print("right")
                 if cur_node.right is None:
                     cur_node.right = Node()
                 cur_node = cur_node.right
             else:
                 # left subtrie
+                print("left")
                 if cur_node.left is None:
                     cur_node.left = Node()
                 cur_node = cur_node.left
 
-            count += 1
+            cur_skip += 1
             cur_bit >>= 1
 
         cur_node.value = value
-        print("Inserted at level {}".format(count))
+        cur_node.skip = cur_skip
+        cur_node.ip = ip
+        print("Inserted with skip {}".format(cur_skip))
 
 if __name__ == "__main__":
     #tree = BinaryTree()
@@ -157,8 +175,17 @@ if __name__ == "__main__":
     #tree.insert("192.168.0.128", 1236)
     #print(tree.find("192.168.0.128"))
 
-    a = 0b10001101
-    b = 0b10011111
+    trie = PatriciaTrie()
+    trie.insert("0.0.0.0/0", 1234)
+    trie.insert("128.0.0.0/1", 1235)
+
+    """ a = 0xF0F0FFFF
+    b = 0xF0F0FAFF
     print(f"{a:b}")
     print(f"{b:b}")
-    print(f"{longest_common_prefix(a, b):b}")
+    lcp = longest_common_prefix(a, b)
+    print(f"{lcp:b}")
+    l = longest_common_prefix_length(a, b)
+    print(l)
+    r = 0x80000000 >> l
+    print(f"{r:32b}") """
