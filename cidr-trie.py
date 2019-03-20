@@ -84,6 +84,10 @@ class BinaryTree:
         return values
 
 def first_set_bit(b):
+    # if b is zero, there is no first set bit
+    if b == 0:
+        return -1
+
     # TODO: change for 128 bits of IPv6
     # gradually set all bits right of MSB
     n = b | b >> 1
@@ -118,7 +122,8 @@ def longest_common_prefix(a, b):
 class PatriciaNode:
     left = None
     right = None
-    skip = None
+    parent = None
+    shift = 0
     ip = 0
     value = None
 
@@ -128,45 +133,67 @@ class PatriciaTrie:
     def insert(self, prefix, value):
         cur_bit = 0x80000000  # the MSB of the IP
         cur_node = self.root
-        cur_skip = 0
+        cur_val = -1
 
         (ip, netmask) = cidrToIpAndNetmask(prefix)
 
+        # create root if it didn't exist
         if cur_node is None:
-            cur_node = PatriciaNode()
+            print("Creating root")
+            self.root = PatriciaNode()
+            self.root.ip = ip
+            self.root.value = value
+            return
 
-        # while we're within the mask
-        while cur_skip < netmask:
-            # insert if we get to a null node
-            if cur_node is None:
-                break
-            
-            lcp_len = longest_common_prefix_length(cur_node.ip, ip)
-            cur_bit >>= lcp_len
-            cur_skip += lcp_len
-            val = ip & cur_bit
+        # otherwise iterate nodes
+        while cur_node is not None:
+            print(f"cur: {cur_node}, inserting: {ip:032b}")
+            cur_val = ip & (0x80000000 >> cur_node.shift)
+            print(f"found val: {cur_val}, shift: {cur_node.shift}")
 
-            # traverse the trie
-            if val != 0:
-                # right subtrie
-                print("right")
+            if cur_val != 0:
+                print("traversing right...")
                 if cur_node.right is None:
-                    cur_node.right = Node()
+                    print("right leaf")
+                    break
                 cur_node = cur_node.right
             else:
-                # left subtrie
-                print("left")
+                print("traversing left...")
                 if cur_node.left is None:
-                    cur_node.left = Node()
+                    print("left leaf")
+                    break
                 cur_node = cur_node.left
+        
+        # find the longest common prefix between this and its parent
+        lcp = longest_common_prefix_length(ip, cur_node.ip)
 
-            cur_skip += 1
-            cur_bit >>= 1
+        print(f"lcp: {lcp}, cur_shift: {cur_node.shift}")
 
-        cur_node.value = value
-        cur_node.skip = cur_skip
-        cur_node.ip = ip
-        print("Inserted with skip {}".format(cur_skip))
+        # if the lcp is larger we can insert
+        if lcp > cur_node.shift:
+            if cur_val == 0:
+                cur_node.left = PatriciaNode()
+                cur_node.left.parent = cur_node
+                cur_node = cur_node.left
+            else:
+                cur_node.right = PatriciaNode()
+                cur_node.right.parent = cur_node
+                cur_node = cur_node.right
+            cur_node.shift = lcp
+            cur_node.ip = ip
+            cur_node.value = value
+            print(f"Inserted with shift {cur_node.shift}")
+            return
+
+        # otherwise we need to iterate up to find a smaller one
+        print("oh no")
+        while lcp <= cur_node.shift:
+            print(f"looking up, lcp: {lcp}, parent shift: {cur_node.parent.shift}")
+            cur_node = cur_node.parent
+
+        print("found")
+        cur_val = ip & (0x80000000 & cur_node.shift)
+        
 
 if __name__ == "__main__":
     #tree = BinaryTree()
@@ -177,7 +204,8 @@ if __name__ == "__main__":
 
     trie = PatriciaTrie()
     trie.insert("0.0.0.0/0", 1234)
-    trie.insert("128.0.0.0/1", 1235)
+    trie.insert("16.0.0.0/8", 1235)
+    trie.insert("32.0.0.0/8", 1236)
 
     """ a = 0xF0F0FFFF
     b = 0xF0F0FAFF
