@@ -131,10 +131,10 @@ class PatriciaTrie:
 if __name__ == "__main__":
     trie = PatriciaTrie()
     trie.insert("0.0.0.0/0", "internet")
-    trie.insert("128.0.0.0/8", "RIR")
-    trie.insert("128.111.0.0/16", "ISP")
-    trie.insert("128.111.67.0/24", "Company A")
-    trie.insert("128.111.67.10", "You")
-    trie.insert("128.111.67.11", "Friend")
+    trie.insert("32.0.0.0/8", "RIR")
+    trie.insert("32.32.0.0/16", "another")
+    trie.insert("32.32.32.0/24", "third")
+    trie.insert("33.0.0.0/8", "RIR3")
+    trie.insert("64.0.0.0/8", "RIR2")
 
-    print(trie.find("128.111.67.11/8"))
+    print(trie.find("32.32.0.0/16"))
