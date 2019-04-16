@@ -1,6 +1,27 @@
 # cidr-trie
 Store CIDR IP addresses (both v4 and v6) in a trie for easy lookup.
 
+## Installation
+- Pip
+```bash
+$ pip install cidr-trie
+```
+
+- From source (Git)
+```bash
+$ git clone https://github.com/Figglewatts/cidr-trie.git
+$ cd cidr-trie
+$ python setup.py install
+```
+
+- From source (PyPI)
+```bash
+$ wget https://files.pythonhosted.org/packages/6b/53/118c09dc2c294f41b12007634d53ed33219d15366ea8a1903fb98eb47c25/cidr_trie-1.0.tar.gz
+$ tar xvf cidr_trie-1.0.tar.gz
+$ cd cidr_trie-1.0
+$ python setup.py install
+```
+
 ## Usage
 ```python
 from cidr_trie import PatriciaTrie
