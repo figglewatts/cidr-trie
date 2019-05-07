@@ -62,3 +62,7 @@ trie.find_all("1234:1001:1920:2000:2020::/128")
 # returns: ['Internet', 'Test', 'Another one', 'A third', 'A different one']
 trie.find_all("1234:1001:1920::ffff")
 ```
+
+## Future work
+- Unit tests
+- Continuous integration

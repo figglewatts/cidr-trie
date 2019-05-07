@@ -6,7 +6,7 @@ addresses.
 
 import ipaddress
 from typing import Tuple
-from .bits_util import bit_not, first_set_bit
+from .bits_util import bit_not, fls
 
 
 def get_subnet_mask(subnet: int, v6: bool) -> int:
@@ -72,4 +72,4 @@ def cidr_atoi(cidr_string: str) -> Tuple[int, int]:
 
 def longest_common_prefix_length(a: int, b: int, v6: bool) -> int:
     """Find the longest common prefix length of 'a' and 'b'."""
-    return (128 if v6 else 32) - first_set_bit(a ^ b, v6) - 1
+    return (128 if v6 else 32) - fls(a ^ b, v6) - 1
