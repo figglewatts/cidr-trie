@@ -26,10 +26,11 @@ def fls(val: int, v6: bool) -> int:
 
     # gradually set all bits right of MSB
     # this technique is called 'bit smearing'
-    # if ipv6, max bit index is 2^8=128, otherwise it's 2^5=32
-    max_power_of_2 = 8 if v6 else 5
+    # if ipv6, max bit index we want to smear is 2^7=64, 
+    # otherwise it's 2^4=16
+    max_power_of_2 = 7 if v6 else 5
     n = val | val >> 1
-    for i in range(1, max_power_of_2):
+    for i in range(1, max_power_of_2+1):
         n |= n >> 2**i
 
     # increment diff by one so that there's only

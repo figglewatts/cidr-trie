@@ -76,60 +76,6 @@ class PatriciaTrie:
         self.v6 = False
         self.size = 0
 
-    def new_insert(self, prefix: str, value: Any) -> None:
-        # check to see if the prefix is IPv6 and then check whether
-        # or not we can store it given what's already in the trie
-        v6 = is_v6(prefix)
-        if self.v6 and not v6:
-            raise ValueError("Cannot store IPv4 prefix in IPv6 trie")
-        elif not self.v6 and v6 and self.size > 0:
-            raise ValueError("Cannot store IPv6 prefix in IPv4 trie")
-        else:
-            self.v6 = v6
-        MAX_PREFIX_LENGTH = 128 if v6 else 32
-
-        # parse the CIDR string
-        ip, mask = cidr_atoi(prefix)
-
-        # traverse until we can't or we reach a leaf
-        last_node = None
-        cur_node = self.root
-        while cur_node is not None and cur_node.bit != MAX_PREFIX_LENGTH:
-            last_node = cur_node
-            if is_set(cur_node.bit, ip, v6):
-                cur_node = cur_node.right
-            else:
-                cur_node = cur_node.left
-        if cur_node is None:
-            cur_node = last_node
-
-        # if this leaf was an exact match
-        if cur_node.ip == ip:
-            cur_node.value = value
-            return
-
-        # it wasn't an exact match, so we need to figure out where to
-        # insert a new node
-        lcp = longest_common_prefix_length(ip, cur_node.ip, v6)
-
-        # traverse back up the tree until we find an LCP less than the
-        # computed one
-        if cur_node is None:
-            cur_node = last_node
-        last_node = None
-        while cur_node.bit > lcp:
-            last_node = cur_node
-            cur_node = cur_node.parent
-
-        ip_ffs = ffs(cur_node.ip)
-        if lcp < ip_ffs:
-            cur_node = cur_node.parent
-
-        
-
-
-        
-
     def insert(self, prefix: str, value: Any) -> None:
         """Insert an IP and value into the trie.
 
@@ -158,8 +104,6 @@ class PatriciaTrie:
         else:
             self.v6 = v6
 
-        print(f"Inserting {prefix}")
-
         # parse the CIDR string
         ip, mask = cidr_atoi(prefix)
 
@@ -169,75 +113,63 @@ class PatriciaTrie:
         while cur_node is not None:
             last_node = cur_node
             if is_set(cur_node.bit, ip, v6):
-                print(f"Going right on bit {cur_node.bit}")
                 cur_node = cur_node.right
             else:
-                print(f"Going left on bit {cur_node.bit}")
                 cur_node = cur_node.left
 
         # check to see if the last node visited was a match
         if last_node.ip == ip:
-            print("Exact match, inserting")
             last_node.value = value
             return
 
         # it wasn't an exact match, so we need to figure out where to
         # insert a new node
         lcp = longest_common_prefix_length(ip, last_node.ip, v6)
-        print(f"lcp [{ip_itoa(ip, False)} vs {ip_itoa(last_node.ip, False)}]: {lcp}")
 
-        # traverse back up the tree until we find an LCP less than the
+        # traverse back up the trie until we find an LCP less than the
         # computed one
         # note: sometimes we don't need to traverse back up, if we reached a
-        # leaf node with a bit already less than the LCP we can just insert on
+        # leaf with a bit already less than the LCP we can just insert on
         # it and this while loop won't even run
         if cur_node is None:
             cur_node = last_node
         last_node = None
-        print(f"cur_node ip: {ip_itoa(cur_node.ip, False)}, bit {cur_node.bit}") 
-        while cur_node.bit > lcp or cur_node.bit == -1:
-            print("going up")
+        while cur_node.bit > lcp:
             last_node = cur_node
             cur_node = cur_node.parent
 
-        ip_ffs = 32 - ffs(cur_node.ip) - 1
-        print(f"lcp {lcp} vs ffs {ip_ffs} on ip {ip_itoa(cur_node.ip, False)}")
-        if cur_node.parent is not None and lcp < ip_ffs:
-            cur_node = cur_node.parent
-            last_node = cur_node
-
-        print(f"cur_node ip: {ip_itoa(cur_node.ip, False)}, bit {cur_node.bit}")
+        # we need to find the rightmost set bit of the new IP address
+        # to use as the bit of the new node, as any future values of LCP
+        # lesser than the position of the rightmost set bit indicate
+        # a prefix that is not common to this one
+        ip_addr_width = 128 if v6 else 32
+        rightmost_set_bit = ip_addr_width - ffs(ip)
 
         # we've now found a node with a bit lower than the LCP,
         # indicating that it's a valid prefix of the current IP
-        # insert the new node on a subtree of the found node
-        to_insert = PatriciaNode(ip, mask, lcp, value)
+        # insert the new node on a subtrie of the found node
+        to_insert = PatriciaNode(ip, mask, rightmost_set_bit, value)
         to_insert.parent = cur_node
-        to_insert.parent.bit = lcp
         if is_set(cur_node.bit, ip, v6):
-            print("inserting right")
             cur_node.right = to_insert
         else:
-            print("inserting left")
             cur_node.left = to_insert
-        print(f"inserted with bit: {to_insert.bit}")
 
         # if we traversed through another node to get to the
-        # found node, we need to put it in a subtree of the
+        # found node, we need to put it in a subtrie of the
         # new node
         if last_node is not None:
             last_node.parent = to_insert
-            # figure out which subtree to insert on
+            # figure out which subtrie to insert on
             if is_set(to_insert.bit, last_node.ip, v6):
-                print("inserting subtree right")
                 to_insert.right = last_node
             else:
-                print("inserting subtree left")
                 to_insert.left = last_node
 
+        # increment the size of the trie due to the added node
         self.size += 1
 
-    def find(self, prefix: str) -> Any:
+    def find(self, prefix: str) -> PatriciaNode:
         """Find a value in the trie.
 
         Args:
@@ -259,11 +191,11 @@ class PatriciaTrie:
         ip, _ = cidr_atoi(prefix)
         for node in self.traverse(prefix):
             if node.ip == ip:
-                return node.value
+                return node
 
         return None
 
-    def find_all(self, prefix: str) -> List[Any]:
+    def find_all(self, prefix: str) -> List[PatriciaNode]:
         """Traverses the trie and returns any values it found.
 
         Args:
@@ -284,13 +216,13 @@ class PatriciaTrie:
             raise ValueError("Trying to find IPv4 value in IPv6 trie")
 
         ip, _ = cidr_atoi(prefix)
-        values = []
+        nodes = []
         for node in self.traverse(prefix):
             # if the node's IP fits within the given network, add it to the result
             if node.ip == (ip & get_subnet_mask(node.mask, v6)) and node.value is not None:
-                values.append(node.value)
+                nodes.append(node)
 
-        return values
+        return nodes
 
     def traverse(self, prefix: str) -> PatriciaNode:
         """Traverse the trie using a prefix.
