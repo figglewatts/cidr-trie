@@ -17,13 +17,16 @@ def is_set(b: int, val: int, v6: bool) -> bool:
         return val & (1 << (31 - b)) != 0
 
 
-def first_set_bit(val: int, v6: bool) -> int:
-    """Get the position of the first set bit in integer 'val'."""
+def fls(val: int, v6: bool) -> int:
+    """Find last set - returns the index, counting from 0 (from the right) of the
+    most significant set bit in `val`."""
     # if b is zero, there is no first set bit
     if val == 0:
         return 0
 
     # gradually set all bits right of MSB
+    # this technique is called 'bit smearing'
+    # if ipv6, max bit index is 2^8=128, otherwise it's 2^5=32
     max_power_of_2 = 8 if v6 else 5
     n = val | val >> 1
     for i in range(1, max_power_of_2):
@@ -42,3 +45,9 @@ def first_set_bit(val: int, v6: bool) -> int:
         n >>= 1
         pos += 1
     return pos
+
+def ffs(x):
+    """Find first set - returns the index, counting from 0 (from the right), of the
+    least significant set bit in `x`.
+    """
+    return (x&-x).bit_length()-1
