@@ -6,7 +6,6 @@ verify_ssl = true
 [dev-packages]
 typing = "*"
 sphinx = "*"
-m2r = "*"
 
 [packages]
 
