@@ -10,3 +10,9 @@ deploy:
 clean:
 	rm -rf build
 	rm -rf dist
+	rm -rf docs/_build
+
+.PHONY: docs
+docs:
+	sphinx-apidoc -f -o docs cidr_trie
+	sphinx-build -b html -a -c docs docs docs/_build
