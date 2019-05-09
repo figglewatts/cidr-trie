@@ -1,22 +1,22 @@
-"""cidr_trie
+"""Store CIDR IP addresses (both v4 and v6) in a PATRICIA trie for easy lookup.
 
-Store CIDR IP addresses (both v4 and v6) in a PATRICIA trie for easy lookup.
+A Patricia trie can be created, inserted to, and searched like this
 
-Example:
-    A Patricia trie can be created, inserted to, and searched like this::
-        trie = PatriciaTrie()
-        trie.insert("0.0.0.0/0", "Internet")
-        trie.insert("32.0.0.0/9", "RIR-A")
-        trie.insert("32.128.0.0/9", "RIR-B")
-        trie.insert("32.32.0.0/16", "another")
-        trie.insert("32.32.32.0/24", "third")
-        trie.insert("32.32.32.32/32", "you")
-        trie.insert("192.168.0.1/32", "totally different")
-        trie.insert("33.0.0.0/8", "RIR3")
-        trie.insert("64.0.0.0/8", "RIR2")
+.. code-block:: python
 
-        # returns: ['Internet', 'RIR-A', 'another', 'third', 'you']
-        trie.find_all("32.32.32.32")
+    trie = PatriciaTrie()
+    trie.insert("0.0.0.0/0", "Internet")
+    trie.insert("32.0.0.0/9", "RIR-A")
+    trie.insert("32.128.0.0/9", "RIR-B")
+    trie.insert("32.32.0.0/16", "another")
+    trie.insert("32.32.32.0/24", "third")
+    trie.insert("32.32.32.32/32", "you")
+    trie.insert("192.168.0.1/32", "totally different")
+    trie.insert("33.0.0.0/8", "RIR3")
+    trie.insert("64.0.0.0/8", "RIR2")
+
+    # returns: ['Internet', 'RIR-A', 'another', 'third', 'you']
+    trie.find_all("32.32.32.32")
 """
 
 from .cidr_util import is_v6, cidr_atoi, longest_common_prefix_length, get_subnet_mask, ip_itoa
@@ -54,21 +54,23 @@ class PatriciaTrie:
         v6 (bool): Whether this trie stores IPv6 addresses or not.
         size (int): The number of nodes in this trie, not counting the root node.
 
-    Example:
-        A Patricia trie can be created, inserted to, and searched like this::
-            trie = PatriciaTrie()
-            trie.insert("0.0.0.0/0", "Internet")
-            trie.insert("32.0.0.0/9", "RIR-A")
-            trie.insert("32.128.0.0/9", "RIR-B")
-            trie.insert("32.32.0.0/16", "another")
-            trie.insert("32.32.32.0/24", "third")
-            trie.insert("32.32.32.32/32", "you")
-            trie.insert("192.168.0.1/32", "totally different")
-            trie.insert("33.0.0.0/8", "RIR3")
-            trie.insert("64.0.0.0/8", "RIR2")
+    A Patricia trie can be created, inserted to, and searched like this
 
-            # returns: ['Internet', 'RIR-A', 'another', 'third', 'you']
-            trie.find_all("32.32.32.32")
+    .. code-block:: python
+
+        trie = PatriciaTrie()
+        trie.insert("0.0.0.0/0", "Internet")
+        trie.insert("32.0.0.0/9", "RIR-A")
+        trie.insert("32.128.0.0/9", "RIR-B")
+        trie.insert("32.32.0.0/16", "another")
+        trie.insert("32.32.32.0/24", "third")
+        trie.insert("32.32.32.32/32", "you")
+        trie.insert("192.168.0.1/32", "totally different")
+        trie.insert("33.0.0.0/8", "RIR3")
+        trie.insert("64.0.0.0/8", "RIR2")
+
+        # returns: ['Internet', 'RIR-A', 'another', 'third', 'you']
+        trie.find_all("32.32.32.32")
 
     """
     def __init__(self) -> None:
@@ -81,17 +83,17 @@ class PatriciaTrie:
 
         If the IP was already in the trie it will overwrite the value.
 
+        .. code-block:: python
+
+            trie = PatriciaTrie()
+            trie.insert("192.168.0.0/16", 1234)
+
         Args:
             prefix: The prefix to insert, i.e. "192.168.0.0/16"
             value: The value to associate with the IP.
 
-        Example::
-            trie = PatriciaTrie()
-            trie.insert("192.168.0.0/16", 1234)
-
         Raises:
-            ValueError: When trying to store an IPv4 address in a trie
-            currently storing IPv6 addresses, and vice-versa.
+            ValueError: When trying to store an IPv4 address in a trie currently storing IPv6 addresses, and vice-versa.
         """
 
         # check to see if the prefix is IPv6 and then check whether
@@ -179,8 +181,7 @@ class PatriciaTrie:
             Any: The data stored in the node if found, None otherwise.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         v6 = is_v6(prefix)
         if v6 and not self.v6:
@@ -205,8 +206,7 @@ class PatriciaTrie:
             List[Any]: The values found when traversing the trie.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
 
         v6 = is_v6(prefix)
@@ -234,8 +234,7 @@ class PatriciaTrie:
             PatriciaNode: The next node traversed when searching for 'prefix'.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         yield self.traverse_from_node(self.root, prefix)
 
@@ -250,8 +249,7 @@ class PatriciaTrie:
             PatriciaNode: The next node traversed when searching for 'prefix'.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
 
         """
         v6 = is_v6(prefix)
@@ -278,8 +276,7 @@ class PatriciaTrie:
             PatriciaNode: The next node in the traversal.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
         cur_node = self.root
@@ -300,8 +297,7 @@ class PatriciaTrie:
             PatriciaNode: The next node in the traversal.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
         cur_node = self.root
@@ -322,8 +318,7 @@ class PatriciaTrie:
             PatriciaNode: The next node in the traversal.
 
         Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie
-            vice-versa.
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
         cur_node = self.root

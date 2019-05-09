@@ -1,5 +1,4 @@
-"""cidr_util
-
+"""
 Contains various utility functions for interacting/manipulating IP and CIDR
 addresses.
 """
