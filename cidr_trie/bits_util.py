@@ -46,6 +46,7 @@ def fls(val: int, v6: bool) -> int:
         pos += 1
     return pos
 
+
 def ffs(x: int) -> int:
     """Find first set - returns the index, counting from 0 (from the right), of the
     least significant set bit in `x`.
