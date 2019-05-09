@@ -15,7 +15,7 @@ A Patricia trie can be created, inserted to, and searched like this
     trie.insert("33.0.0.0/8", "RIR3")
     trie.insert("64.0.0.0/8", "RIR2")
 
-    # returns: ['Internet', 'RIR-A', 'another', 'third', 'you']
+    # a generator for nodes corresponding to: ['Internet', 'RIR-A', 'another', 'third', 'you']
     trie.find_all("32.32.32.32")
 """
 
@@ -69,7 +69,7 @@ class PatriciaTrie:
         trie.insert("33.0.0.0/8", "RIR3")
         trie.insert("64.0.0.0/8", "RIR2")
 
-        # returns: ['Internet', 'RIR-A', 'another', 'third', 'you']
+        # a generator for nodes corresponding to: ['Internet', 'RIR-A', 'another', 'third', 'you']
         trie.find_all("32.32.32.32")
 
     """
@@ -145,7 +145,7 @@ class PatriciaTrie:
         # lesser than the position of the rightmost set bit indicate
         # a prefix that is not common to this one
         ip_addr_width = 128 if v6 else 32
-        rightmost_set_bit = ip_addr_width - ffs(ip)
+        rightmost_set_bit = ip_addr_width - ffs(ip) - 1
 
         # we've now found a node with a bit lower than the LCP,
         # indicating that it's a valid prefix of the current IP
@@ -236,7 +236,8 @@ class PatriciaTrie:
         Raises:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
-        yield self.traverse_from_node(self.root, prefix)
+        for node in self.traverse_from_node(self.root, prefix):
+            yield node
 
     def traverse_from_node(self, node: PatriciaNode, prefix: str) -> PatriciaNode:
         """Traverse the trie from a specific node using a prefix.
