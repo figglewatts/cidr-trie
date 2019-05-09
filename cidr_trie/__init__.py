@@ -225,7 +225,7 @@ class PatriciaTrie:
         return nodes
 
     def traverse(self, prefix: str) -> PatriciaNode:
-        """Traverse the trie using a prefix.
+        """Traverse the entire trie (from root) using a prefix.
 
         Args:
             prefix: The prefix to find in the trie, i.e. "192.168.0.0/16"
@@ -237,6 +237,23 @@ class PatriciaTrie:
             ValueError: When trying to find an IPv4 address in a v6 trie
             vice-versa.
         """
+        yield self.traverse_from_node(self.root, prefix)
+
+    def traverse_from_node(self, node: PatriciaNode, prefix: str) -> PatriciaNode:
+        """Traverse the trie from a specific node using a prefix.
+
+        Args:
+            node: The node to start traversing from.
+            prefix: The prefix to find in the trie, i.e. "192.168.0.0/16"
+
+        Yields:
+            PatriciaNode: The next node traversed when searching for 'prefix'.
+
+        Raises:
+            ValueError: When trying to find an IPv4 address in a v6 trie
+            vice-versa.
+
+        """
         v6 = is_v6(prefix)
         if v6 and not self.v6:
             raise ValueError("Trying to find IPv6 value in IPv4 trie")
@@ -246,7 +263,7 @@ class PatriciaTrie:
         ip, _ = cidr_atoi(prefix)
 
         # look for a leaf
-        cur_node = self.root
+        cur_node = node
         while cur_node is not None:
             yield cur_node
             if is_set(cur_node.bit, ip, v6):
