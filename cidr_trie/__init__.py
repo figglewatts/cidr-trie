@@ -271,7 +271,22 @@ class PatriciaTrie:
                 cur_node = cur_node.left
 
     def traverse_inorder(self) -> PatriciaNode:
-        """Perform an inorder traversal of the trie.
+        """Perform an inorder traversal of the trie from the root node.
+
+        Yields:
+            PatriciaNode: The next node in the traversal.
+
+        Raises:
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
+        """
+        for node in self.traverse_inorder_from_node(self.root):
+            yield node
+
+    def traverse_inorder_from_node(self, node: PatriciaNode) -> PatriciaNode:
+        """Perform an inorder traversal of the trie from a given node.
+
+        Args:
+            node: The node to traverse from.
 
         Yields:
             PatriciaNode: The next node in the traversal.
@@ -280,7 +295,7 @@ class PatriciaTrie:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
-        cur_node = self.root
+        cur_node = node
         while len(stack) > 0 or cur_node is not None:
             while cur_node is not None:
                 stack.append(cur_node)
@@ -292,7 +307,22 @@ class PatriciaTrie:
                 cur_node = cur_node.right
 
     def traverse_preorder(self) -> PatriciaNode:
-        """Perform a preorder traversal of the trie.
+        """Perform a preorder traversal of the trie from the root node.
+
+        Yields:
+            PatriciaNode: The next node in the traversal.
+
+        Raises:
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
+        """
+        for node in self.traverse_preorder_from_node(self.root):
+            yield node
+
+    def traverse_preorder_from_node(self, node: PatriciaNode) -> PatriciaNode:
+        """Perform a preorder traversal of the trie from a given node.
+
+        Args:
+            node: The node to traverse from.
 
         Yields:
             PatriciaNode: The next node in the traversal.
@@ -301,7 +331,7 @@ class PatriciaTrie:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
-        cur_node = self.root
+        cur_node = node
         while len(stack) > 0 or cur_node is not None:
             while cur_node is not None:
                 stack.append(cur_node)
@@ -313,7 +343,22 @@ class PatriciaTrie:
                 cur_node = cur_node.right
 
     def traverse_postorder(self) -> PatriciaNode:
-        """Perform a postorder traversal of the trie.
+        """Perform a postorder traversal of the trie from a given node.
+
+        Yields:
+            PatriciaNode: The next node in the traversal.
+
+        Raises:
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
+        """
+        for node in self.traverse_postorder_from_node(self.root):
+            yield node
+
+    def traverse_postorder_from_node(self, node: PatriciaNode) -> PatriciaNode:
+        """Perform a postorder traversal of the trie from a given node.
+
+        Args:
+            node: The node to traverse from.
 
         Yields:
             PatriciaNode: The next node in the traversal.
@@ -322,7 +367,7 @@ class PatriciaTrie:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
-        cur_node = self.root
+        cur_node = node
         prev_node = None
         while len(stack) > 0 or cur_node is not None:
             while cur_node is not None:
