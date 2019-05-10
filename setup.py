@@ -2,14 +2,14 @@ from setuptools import setup, find_packages
 
 
 def readme():
-    with open("README.md") as r:
+    with open("README.rst") as r:
         return r.read()
 
 setup(name="cidr_trie",
-      version="1.1",
+      version="2.0",
       description="Store/search CIDR prefixes in a trie structure.",
       long_description=readme(),
-      long_description_content_type="text/markdown",
+      long_description_content_type="text/x-rst",
       keywords="cidr ip ipv4 ipv6 trie",
       classifiers=[
           "Development Status :: 5 - Production/Stable",
