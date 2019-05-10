@@ -292,7 +292,7 @@ class PatriciaTrie:
             raise ValueError("Trying to find IPv4 value in IPv6 trie")
 
         values = {}
-        
+
         # for each node on the way down
         for node in self.traverse(prefix):
             # get the values from the node and combine them into
