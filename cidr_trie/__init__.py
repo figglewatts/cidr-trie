@@ -105,7 +105,7 @@ class PatriciaTrie:
         self.v6 = False
         self.size = 0
 
-    def insert(self, prefix: str, data: Any) -> None:
+    def insert(self, prefix: str, data: Any) -> PatriciaNode:
         """Insert an IP and data into the trie.
 
         If the IP was already in the trie it will overwrite the value.
@@ -118,6 +118,9 @@ class PatriciaTrie:
         Args:
             prefix: The prefix to insert, i.e. "192.168.0.0/16"
             data: The value to associate with the IP and netmask.
+
+        Returns:
+            PatriciaNode: The node that was inserted in the trie.
 
         Raises:
             ValueError: When trying to store an IPv4 address in a trie currently storing IPv6 addresses, and vice-versa.
@@ -148,8 +151,9 @@ class PatriciaTrie:
 
         # check to see if the last node visited was a match
         if last_node.ip == ip:
+            # if it was, set the value and return the node
             last_node.value[mask] = data
-            return
+            return last_node
 
         # it wasn't an exact match, so we need to figure out where to
         # insert a new node
@@ -197,6 +201,9 @@ class PatriciaTrie:
 
         # increment the size of the trie due to the added node
         self.size += 1
+
+        # return the inserted node
+        return to_insert
 
     def check_value_exists(self, prefix: str) -> (bool, bool):
         """Check to see if a value exists in the trie already.
