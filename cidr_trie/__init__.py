@@ -246,23 +246,17 @@ class PatriciaTrie:
         # parse the CIDR string
         ip, mask = cidr_atoi(prefix)
 
-        # traverse the trie with the given IP
-        last_node = None
-        for node in self.traverse(prefix):
-            last_node = node
-
         ip_exists = False
         mask_exists = False
 
-        if last_node.ip == ip:
-            # if the last node's IP equals this IP, the IP exists
-            # we now need to check if the mask is in the set of masks
-            ip_exists = True
-            mask_exists = mask in last_node.value
-        else:
-            # if the IP didn't exist, we can be sure the mask didn't either
-            ip_exists = False
-            mask_exists = False
+        # traverse the trie with the given IP
+        for node in self.traverse(prefix):
+            if node.ip == ip:
+                # if the node's IP equals this IP, the IP exists
+                # we now need to check if the mask is in the set of masks
+                ip_exists = True
+                mask_exists = mask in node.value
+                break
 
         return ip_exists, mask_exists
 
@@ -292,6 +286,17 @@ class PatriciaTrie:
         return None
 
     def find_all_values(self, prefix: str) -> Dict[str, Any]:
+        """Traverse the trie and get all values that fit this prefix from nodes visited.
+
+        Args:
+            prefix: The prefix to find values for, i.e. "192.168.0.0/16"
+        
+        Returns:
+            Dict[str, Any]: A map of prefixes to data. I.e. {"192.168.0.1": "this is data"}
+
+        Raises:
+            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
+        """
         v6 = is_v6(prefix)
         if v6 and not self.v6:
             raise ValueError("Trying to find IPv6 value in IPv4 trie")
