@@ -19,6 +19,8 @@ A Patricia trie can be created, inserted to, and searched like this
     trie.find_all("32.32.32.32")
 """
 
+import threading
+
 from .cidr_util import is_v6, cidr_atoi, longest_common_prefix_length, get_subnet_mask, ip_itoa
 from .bits_util import is_set, ffs
 from typing import Any, List, Dict, Tuple
@@ -68,7 +70,7 @@ class PatriciaNode:
                 continue
 
             if self.ip == (ip & get_subnet_mask(m, v6)):
-                result[f"{ip_itoa(self.ip, False)}/{m}"] = self.value[m]
+                result[f"{ip_itoa(self.ip, v6)}/{m}"] = self.value[m]
 
         return result
 
@@ -104,6 +106,7 @@ class PatriciaTrie:
         self.root = PatriciaNode(0, 0)
         self.v6 = False
         self.size = 0
+        self.lock = threading.Lock()
 
     def insert(self, prefix: str, data: Any) -> PatriciaNode:
         """Insert an IP and data into the trie.
@@ -126,81 +129,84 @@ class PatriciaTrie:
             ValueError: When trying to store an IPv4 address in a trie currently storing IPv6 addresses, and vice-versa.
         """
 
-        # check to see if the prefix is IPv6 and then check whether
-        # or not we can store it given what's already in the trie
-        v6 = is_v6(prefix)
-        if self.v6 and not v6:
-            raise ValueError("Cannot store IPv4 prefix in IPv6 trie")
-        elif not self.v6 and v6 and self.size > 0:
-            raise ValueError("Cannot store IPv6 prefix in IPv4 trie")
-        else:
-            self.v6 = v6
+        # make sure we have the lock otherwise we might get an error when
+        # performing an insert operation on the trie
+        with self.lock:
+            # check to see if the prefix is IPv6 and then check whether
+            # or not we can store it given what's already in the trie
+            v6 = is_v6(prefix)
+            if self.v6 and not v6:
+                raise ValueError("Cannot store IPv4 prefix in IPv6 trie")
+            elif not self.v6 and v6 and self.size > 0:
+                raise ValueError("Cannot store IPv6 prefix in IPv4 trie")
+            else:
+                self.v6 = v6
 
-        # parse the CIDR string
-        ip, mask = cidr_atoi(prefix)
+            # parse the CIDR string
+            ip, mask = cidr_atoi(prefix)
 
-        # traverse with the value until we reach a leaf
-        last_node = None
-        cur_node = self.root
-        while cur_node is not None:
-            last_node = cur_node
+            # traverse with the value until we reach a leaf
+            last_node = None
+            cur_node = self.root
+            while cur_node is not None:
+                last_node = cur_node
+                if is_set(cur_node.bit, ip, v6):
+                    cur_node = cur_node.right
+                else:
+                    cur_node = cur_node.left
+
+            # check to see if the last node visited was a match
+            if last_node.ip == ip:
+                # if it was, set the value and return the node
+                last_node.value[mask] = data
+                return last_node
+
+            # it wasn't an exact match, so we need to figure out where to
+            # insert a new node
+            lcp = longest_common_prefix_length(ip, last_node.ip, v6)
+
+            # traverse back up the trie until we find an LCP less than the
+            # computed one
+            # note: sometimes we don't need to traverse back up, if we reached a
+            # leaf with a bit already less than the LCP we can just insert on
+            # it and this while loop won't even run
+            if cur_node is None:
+                cur_node = last_node
+            last_node = None
+            while cur_node.bit > lcp:
+                last_node = cur_node
+                cur_node = cur_node.parent
+
+            # we need to find the rightmost set bit of the new IP address
+            # to use as the bit of the new node, as any future values of LCP
+            # lesser than the position of the rightmost set bit indicate
+            # a prefix that is not common to this one
+            ip_addr_width = 128 if v6 else 32
+            rightmost_set_bit = ip_addr_width - ffs(ip) - 1
+
+            # we've now found a node with a bit lower than the LCP,
+            # indicating that it's a valid prefix of the current IP
+            # insert the new node on a subtrie of the found node
+            to_insert = PatriciaNode(ip, rightmost_set_bit, {mask: data})
+            to_insert.parent = cur_node
             if is_set(cur_node.bit, ip, v6):
-                cur_node = cur_node.right
+                cur_node.right = to_insert
             else:
-                cur_node = cur_node.left
+                cur_node.left = to_insert
 
-        # check to see if the last node visited was a match
-        if last_node.ip == ip:
-            # if it was, set the value and return the node
-            last_node.value[mask] = data
-            return last_node
+            # if we traversed through another node to get to the
+            # found node, we need to put it in a subtrie of the
+            # new node
+            if last_node is not None:
+                last_node.parent = to_insert
+                # figure out which subtrie to insert on
+                if is_set(to_insert.bit, last_node.ip, v6):
+                    to_insert.right = last_node
+                else:
+                    to_insert.left = last_node
 
-        # it wasn't an exact match, so we need to figure out where to
-        # insert a new node
-        lcp = longest_common_prefix_length(ip, last_node.ip, v6)
-
-        # traverse back up the trie until we find an LCP less than the
-        # computed one
-        # note: sometimes we don't need to traverse back up, if we reached a
-        # leaf with a bit already less than the LCP we can just insert on
-        # it and this while loop won't even run
-        if cur_node is None:
-            cur_node = last_node
-        last_node = None
-        while cur_node.bit > lcp:
-            last_node = cur_node
-            cur_node = cur_node.parent
-
-        # we need to find the rightmost set bit of the new IP address
-        # to use as the bit of the new node, as any future values of LCP
-        # lesser than the position of the rightmost set bit indicate
-        # a prefix that is not common to this one
-        ip_addr_width = 128 if v6 else 32
-        rightmost_set_bit = ip_addr_width - ffs(ip) - 1
-
-        # we've now found a node with a bit lower than the LCP,
-        # indicating that it's a valid prefix of the current IP
-        # insert the new node on a subtrie of the found node
-        to_insert = PatriciaNode(ip, rightmost_set_bit, {mask: data})
-        to_insert.parent = cur_node
-        if is_set(cur_node.bit, ip, v6):
-            cur_node.right = to_insert
-        else:
-            cur_node.left = to_insert
-
-        # if we traversed through another node to get to the
-        # found node, we need to put it in a subtrie of the
-        # new node
-        if last_node is not None:
-            last_node.parent = to_insert
-            # figure out which subtrie to insert on
-            if is_set(to_insert.bit, last_node.ip, v6):
-                to_insert.right = last_node
-            else:
-                to_insert.left = last_node
-
-        # increment the size of the trie due to the added node
-        self.size += 1
+            # increment the size of the trie due to the added node
+            self.size += 1
 
         # return the inserted node
         return to_insert
