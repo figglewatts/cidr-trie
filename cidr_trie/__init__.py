@@ -252,10 +252,11 @@ class PatriciaTrie:
         # parse the CIDR string
         ip, mask = cidr_atoi(prefix)
 
-        # traverse the trie with the given IP
-        last_node = None
-        for node in self.traverse(prefix):
-            last_node = node
+        with self.lock:
+            # traverse the trie with the given IP
+            last_node = None
+            for node in self.traverse(prefix):
+                last_node = node
 
         ip_exists = False
         mask_exists = False
@@ -290,10 +291,11 @@ class PatriciaTrie:
         elif not v6 and self.v6:
             raise ValueError("Trying to find IPv4 value in IPv6 trie")
         
-        ip, _ = cidr_atoi(prefix)
-        for node in self.traverse(prefix):
-            if node.ip == ip:
-                return node
+        with self.lock:
+            ip, _ = cidr_atoi(prefix)
+            for node in self.traverse(prefix):
+                if node.ip == ip:
+                    return node
 
         return None
 
@@ -306,12 +308,13 @@ class PatriciaTrie:
 
         values = {}
 
-        # for each node on the way down
-        for node in self.traverse(prefix):
-            # get the values from the node and combine them into
-            # the result dictionary
-            vals = node.get_values(prefix)
-            values = {**values, **vals}
+        with self.lock:
+            # for each node on the way down
+            for node in self.traverse(prefix):
+                # get the values from the node and combine them into
+                # the result dictionary
+                vals = node.get_values(prefix)
+                values = {**values, **vals}
         return values
 
 
