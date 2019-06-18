@@ -6,7 +6,7 @@ def readme():
         return r.read()
 
 setup(name="cidr_trie",
-      version="2.1.3",
+      version="2.1.4",
       description="Store/search CIDR prefixes in a trie structure.",
       long_description=readme(),
       long_description_content_type="text/x-rst",
