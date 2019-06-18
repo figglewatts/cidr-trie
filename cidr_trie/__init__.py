@@ -208,8 +208,9 @@ class PatriciaTrie:
             # increment the size of the trie due to the added node
             self.size += 1
 
-        # return the inserted node
-        return to_insert
+            # return the inserted node
+            return to_insert
+
 
     def check_value_exists(self, prefix: str) -> (bool, bool):
         """Check to see if a value exists in the trie already.
@@ -252,9 +253,9 @@ class PatriciaTrie:
         # parse the CIDR string
         ip, mask = cidr_atoi(prefix)
 
+        last_node = None
         with self.lock:
             # traverse the trie with the given IP
-            last_node = None
             for node in self.traverse(prefix):
                 last_node = node
 
