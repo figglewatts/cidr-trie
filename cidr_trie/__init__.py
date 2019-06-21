@@ -74,6 +74,33 @@ class PatriciaNode:
 
         return result
 
+    def get_child_values(self, prefix: str) -> Dict[str, Any]:
+        """Get all child values from this node by iterating through netmasks and
+        checking to see if the given prefix is larger than the given netmask.
+
+        Args:
+            prefix: The prefix to use to check, i.e. "192.168.0.0/16"
+        Returns:
+            Dict[str, Any]: dict mapping prefixes to values, i.e. {"192.168.0.0/24": 2856}
+        """
+        # parse the CIDR string
+        _, mask = cidr_atoi(prefix)
+        v6 = is_v6(prefix)
+        result = {}
+
+        # for each mask stored in this node, check to see if the netmask is greater than
+        # the given netmask
+        for m in self.value.keys():
+            # if the mask is greater than the given mask, there's no way the prefix
+            # can be in this range, as it's bigger than this network
+            if m < mask:
+                continue
+
+            result[f"{ip_itoa(self.ip, v6)}/{m}"] = self.value[m]
+
+        return result
+
+
 
 class PatriciaTrie:
     """A Patricia trie that stores IP addresses and data.
@@ -317,6 +344,8 @@ class PatriciaTrie:
 
         values = {}
 
+        ip, m = cidr_atoi(prefix)
+
         last_node = None
         # for each node on the way down
         for node in self.traverse(prefix):
@@ -325,10 +354,12 @@ class PatriciaTrie:
             # the result dictionary
             vals = node.get_values(prefix)
             values = {**values, **vals}
+            if node.ip == ip:
+                break
 
         # for each child node of the found node above
         for node in self.traverse_inorder_from_node(last_node):
-            vals = node.get_values(prefix)
+            vals = node.get_child_values(prefix)
             values = {**values, **vals}
 
         return values
