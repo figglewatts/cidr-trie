@@ -321,7 +321,7 @@ class PatriciaTrie:
 
         return None
 
-    def find_all_values(self, prefix: str) -> Dict[str, Any]:
+    def find_all_values(self, prefix: str, children: bool=False) -> Dict[str, Any]:
         """Find all values for this prefix, traversing the trie at all levels.
 
         With get all values from common prefixes of 'prefix', then traverse all
@@ -329,6 +329,7 @@ class PatriciaTrie:
 
         Args:
             prefix: The prefix to find in the trie.
+            children: Whether to find all child values of the exact node found. (Defaults to False, as this isn't performant in large tries)
 
         Returns:
             Dict[str, Any]: All of the values from the trie, by prefix.
@@ -344,7 +345,7 @@ class PatriciaTrie:
 
         values = {}
 
-        ip, m = cidr_atoi(prefix)
+        ip, _ = cidr_atoi(prefix)
 
         last_node = None
         # for each node on the way down
@@ -357,10 +358,11 @@ class PatriciaTrie:
             if node.ip == ip:
                 break
 
-        # for each child node of the found node above
-        for node in self.traverse_inorder_from_node(last_node):
-            vals = node.get_child_values(prefix)
-            values = {**values, **vals}
+        if children:
+            # for each child node of the found node above
+            for node in self.traverse_inorder_from_node(last_node):
+                vals = node.get_child_values(prefix)
+                values = {**values, **vals}
 
         return values
 
