@@ -9,7 +9,13 @@ def bit_not(n: int, numbits: int=32) -> int:
 
 
 def is_set(b: int, val: int, v6: bool) -> bool:
-    """Return whether b-th bit is set in integer 'val'."""
+    """Return whether b-th bit is set in integer 'val'.
+    
+    Special case: when b < 0, it acts as if it were 0.
+    """
+    if b < 0:
+        b = 0
+
     if v6:
         return val & (1 << (127 - b)) != 0
     else:
