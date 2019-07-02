@@ -15,8 +15,8 @@ A Patricia trie can be created, inserted to, and searched like this
     trie.insert("33.0.0.0/8", "RIR3")
     trie.insert("64.0.0.0/8", "RIR2")
 
-    # a generator for nodes corresponding to: ['Internet', 'RIR-A', 'another', 'third', 'you']
-    trie.find_all("32.32.32.32")
+    # find all node values on the way down
+    print(trie.find_all("32.32.32.32"))
 """
 
 import threading
@@ -32,46 +32,68 @@ class PatriciaNode:
     Attributes:
         ip (int): The IP address associated with this node.
         bit (int): How many bits along the IP the decision is made to branch.
-        value (Dict[int, Any]): The data stored on this node. Maps netmasks to data.
-        parent (PatriciaNode): The parent of this node.
-        left (PatriciaNode): The left subtrie of this node.
-        right (PatriciaNode): The right subtrie of this node.
+        masks (Dict[int, Any]): The data stored on this node. Maps netmasks to data.
+        left (PatriciaNode): The left subtrie of this node. Self pointer if no left node.
+        right (PatriciaNode): The right subtrie of this node. Self pointer if no right node.
     """
-    def __init__(self, ip: int=0, bit: int=0, data: Dict[int, Any]={}) -> None:
+    def __init__(self, ip: int=0, bit: int=0, masks: Dict[int, Any]={}) -> None:
         self.ip = ip
         self.bit = bit
-        self.value = data
-        self.parent = None
-        self.left = None
-        self.right = None
+        self.masks = masks
+        self.left = self
+        self.right = self
 
-    def get_values(self, prefix: str) -> Dict[str, Any]:
+    def get_values(self, prefix: str) -> List[Tuple[str, Any]]:
         """Get values from this node by iterating through netmasks and
         checking to see if the given prefix is contained within.
 
         Args:
             prefix: The prefix to use to check, i.e. "192.168.0.0/16"
         Returns:
-            Dict[str, Any]: dict mapping prefixes to values, i.e. {"192.168.0.0/16": 2856}
+            List[Tuple[str, Any]]: list of tuples of prefixes and values, i.e. [("192.168.0.0/16", 2856), ...]
         """
         # parse the CIDR string
         ip, mask = cidr_atoi(prefix)
         v6 = is_v6(prefix)
-        result = {}
+        result = []
 
-        # for each mask stored in this node, check to see if the IP given
-        # by the prefix masked by the mask is equal to the IP stored in the node
+        # for each mask stored on this node, check to see if the IP given by the
+        # prefix masked by the mask is equal to the IP stored in the node
         # this indicates that this IP is within the network defined by the node
-        # IP and particular netmask
-        for m in self.value.keys():
-            # if the mask is greater than the given mask, there's no way the prefix
-            # can be in this range, as it's bigger than this network
+        # and particular netmask
+        for m in self.masks.keys():
+            # if the mask is greater than the given mask, there's no way the
+            # prefix can be in this range, as it's bigger than this network
             if m > mask:
                 continue
 
             if self.ip == (ip & get_subnet_mask(m, v6)):
-                result[f"{ip_itoa(self.ip, v6)}/{m}"] = self.value[m]
+                ip_str = f"{ip_itoa(self.ip, v6)}/{m}"
+                result.append((ip_str, self.masks[m]))
+        return result
 
+    def get_child_values(self, prefix: str) -> List[Tuple[str, Any]]:
+        """Get all child values from this node by iterating through netmasks and
+        checking to see if the given prefix is larger than the given netmask.
+
+        Args:
+            prefix: The prefix to use to check, i.e. "192.168.0.0/16"
+        Returns:
+            List[Tuple[str, Any]]: list of tuples of prefixes and values, i.e. [("192.168.0.0/16", 2856), ...]
+        """
+        # parse the CIDR string
+        _, mask = cidr_atoi(prefix)
+        v6 = is_v6(prefix)
+        result = []
+
+        # for each mask stored in this node, check to see if the netmask is
+        # greater than the given netmask
+        for m in self.masks.keys():
+            if m < mask:
+                continue
+
+            ip_str = f"{ip_itoa(self.ip, v6)}/{m}"
+            result.append((ip_str, self.masks[m]))
         return result
 
 
@@ -98,15 +120,26 @@ class PatriciaTrie:
         trie.insert("33.0.0.0/8", "RIR3")
         trie.insert("64.0.0.0/8", "RIR2")
 
-        # a generator for nodes corresponding to: ['Internet', 'RIR-A', 'another', 'third', 'you']
-        trie.find_all("32.32.32.32")
+        # find all node values on the way down
+        print(trie.find_all("32.32.32.32"))
 
     """
     def __init__(self) -> None:
-        self.root = PatriciaNode(0, 0)
+        self.root = PatriciaNode(bit=-1)
         self.v6 = False
         self.size = 0
-        self.lock = threading.Lock()
+
+    def validate_ip_type_for_trie(self, ip: str) -> None:
+        """Make sure this IP is valid for this trie.
+
+        Raises:
+            ValueError: if trying to insert a v4 address into a v6 trie and vice-versa.
+        """
+        v6 = is_v6(ip)
+        if v6 == True and self.v6 == False:
+            raise ValueError("Cannot store IPv6 prefix in IPv4 trie")
+        elif v6 == False and self.v6 == True:
+            raise ValueError("Cannot store IPv4 prefix in IPv6 trie")
 
     def insert(self, prefix: str, data: Any) -> PatriciaNode:
         """Insert an IP and data into the trie.
@@ -128,89 +161,61 @@ class PatriciaTrie:
         Raises:
             ValueError: When trying to store an IPv4 address in a trie currently storing IPv6 addresses, and vice-versa.
         """
-
-        # make sure we have the lock otherwise we might get an error when
-        # performing an insert operation on the trie
-        with self.lock:
-            # check to see if the prefix is IPv6 and then check whether
-            # or not we can store it given what's already in the trie
-            v6 = is_v6(prefix)
-            if self.v6 and not v6:
-                raise ValueError("Cannot store IPv4 prefix in IPv6 trie")
-            elif not self.v6 and v6 and self.size > 0:
-                raise ValueError("Cannot store IPv6 prefix in IPv4 trie")
+        if self.size == 0:
+            # set the v6 value if first insert
+            self.v6 = is_v6(prefix)
+        
+        self.validate_ip_type_for_trie(prefix)
+        
+        ip, mask = cidr_atoi(prefix)
+        
+        # traverse the trie until we get to a leaf to check
+        last_bit = -2 # -2 as it has to be lower than the root (which is -1)
+        cur_node = self.root
+        while last_bit < cur_node.bit:
+            last_bit = cur_node.bit
+            if is_set(cur_node.bit, ip, False):
+                cur_node = cur_node.right
             else:
-                self.v6 = v6
+                cur_node = cur_node.left
 
-            # parse the CIDR string
-            ip, mask = cidr_atoi(prefix)
+        # check to see if the IP is equal
+        if cur_node.ip == ip:
+            cur_node.masks[mask] = data
+            return cur_node
 
-            # traverse with the value until we reach a leaf
-            last_node = None
-            cur_node = self.root
-            while cur_node is not None:
-                last_node = cur_node
-                if is_set(cur_node.bit, ip, v6):
-                    cur_node = cur_node.right
-                else:
-                    cur_node = cur_node.left
+        # they're different, so find the rightmost bit where they differ
+        differ_bit = 0
+        while is_set(differ_bit, cur_node.ip, False) == is_set(differ_bit, ip, False):
+            differ_bit += 1
 
-            # check to see if the last node visited was a match
-            if last_node.ip == ip:
-                # if it was, set the value and return the node
-                last_node.value[mask] = data
-                return last_node
-
-            # it wasn't an exact match, so we need to figure out where to
-            # insert a new node
-            lcp = longest_common_prefix_length(ip, last_node.ip, v6)
-
-            # traverse back up the trie until we find an LCP less than the
-            # computed one
-            # note: sometimes we don't need to traverse back up, if we reached a
-            # leaf with a bit already less than the LCP we can just insert on
-            # it and this while loop won't even run
-            if cur_node is None:
-                cur_node = last_node
-            last_node = None
-            while cur_node.bit > lcp:
-                last_node = cur_node
-                cur_node = cur_node.parent
-
-            # we need to find the rightmost set bit of the new IP address
-            # to use as the bit of the new node, as any future values of LCP
-            # lesser than the position of the rightmost set bit indicate
-            # a prefix that is not common to this one
-            ip_addr_width = 128 if v6 else 32
-            rightmost_set_bit = ip_addr_width - ffs(ip) - 1
-
-            # we've now found a node with a bit lower than the LCP,
-            # indicating that it's a valid prefix of the current IP
-            # insert the new node on a subtrie of the found node
-            to_insert = PatriciaNode(ip, rightmost_set_bit, {mask: data})
-            to_insert.parent = cur_node
-            if is_set(cur_node.bit, ip, v6):
-                cur_node.right = to_insert
+        # travel down the trie to that point
+        last_node = PatriciaNode(bit=-2) # -2 as it has to be lower than the root (-1)
+        cur_node = self.root
+        while last_node.bit < cur_node.bit and cur_node.bit <= differ_bit:
+            last_node = cur_node
+            if is_set(cur_node.bit, ip, False):
+                cur_node = cur_node.right
             else:
-                cur_node.left = to_insert
+                cur_node = cur_node.left
 
-            # if we traversed through another node to get to the
-            # found node, we need to put it in a subtrie of the
-            # new node
-            if last_node is not None:
-                last_node.parent = to_insert
-                # figure out which subtrie to insert on
-                if is_set(to_insert.bit, last_node.ip, v6):
-                    to_insert.right = last_node
-                else:
-                    to_insert.left = last_node
+        # create the new node
+        to_insert = PatriciaNode(ip, differ_bit, {mask: data})
 
-            # increment the size of the trie due to the added node
-            self.size += 1
+        # figure out where to put child
+        if is_set(to_insert.bit, cur_node.ip, False):
+            to_insert.right = cur_node
+        else:
+            to_insert.left = cur_node
 
-            # return the inserted node
-            return to_insert
+        # figure out which side to insert on
+        if is_set(last_node.bit, ip, False):
+            last_node.right = to_insert
+        else:
+            last_node.left = to_insert
 
+        self.size += 1
+        return to_insert
 
     def check_value_exists(self, prefix: str) -> (bool, bool):
         """Check to see if a value exists in the trie already.
@@ -240,24 +245,17 @@ class PatriciaTrie:
         Raises:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
-        # check to see if the prefix is IPv6 and then check whether
-        # or not we can store it given what's already in the trie
-        v6 = is_v6(prefix)
-        if self.v6 and not v6:
-            raise ValueError("Cannot store IPv4 prefix in IPv6 trie")
-        elif not self.v6 and v6 and self.size > 0:
-            raise ValueError("Cannot store IPv6 prefix in IPv4 trie")
-        else:
-            self.v6 = v6
+        self.validate_ip_type_for_trie(prefix)
 
         # parse the CIDR string
         ip, mask = cidr_atoi(prefix)
 
+        # traverse the trie with the given IP
         last_node = None
-        with self.lock:
-            # traverse the trie with the given IP
-            for node in self.traverse(prefix):
-                last_node = node
+        for node in self.traverse(prefix):
+            last_node = node
+            if node.ip == ip:
+                break
 
         ip_exists = False
         mask_exists = False
@@ -266,11 +264,7 @@ class PatriciaTrie:
             # if the last node's IP equals this IP, the IP exists
             # we now need to check if the mask is in the set of masks
             ip_exists = True
-            mask_exists = mask in last_node.value
-        else:
-            # if the IP didn't exist, we can be sure the mask didn't either
-            ip_exists = False
-            mask_exists = False
+            mask_exists = mask in last_node.masks
 
         return ip_exists, mask_exists
 
@@ -286,66 +280,50 @@ class PatriciaTrie:
         Raises:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
-        v6 = is_v6(prefix)
-        if v6 and not self.v6:
-            raise ValueError("Trying to find IPv6 value in IPv4 trie")
-        elif not v6 and self.v6:
-            raise ValueError("Trying to find IPv4 value in IPv6 trie")
+        self.validate_ip_type_for_trie(prefix)
+        ip, _ = cidr_atoi(prefix)
         
-        with self.lock:
-            ip, _ = cidr_atoi(prefix)
-            for node in self.traverse(prefix):
-                if node.ip == ip:
-                    return node
+        for node in self.traverse(prefix):
+            if node.ip == ip:
+                return node
 
+        # if we get to here, the node isn't in the trie
         return None
 
-    def find_all_values(self, prefix: str) -> Dict[str, Any]:
-        v6 = is_v6(prefix)
-        if v6 and not self.v6:
-            raise ValueError("Trying to find IPv6 value in IPv4 trie")
-        elif not v6 and self.v6:
-            raise ValueError("Trying to find IPv4 value in IPv6 trie")
+    def find_all(self, prefix: str, children: bool=False) -> List[Tuple[str, Any]]:
+        """Find all values for this prefix, traversing the trie at all levels.
 
-        values = {}
-
-        with self.lock:
-            # for each node on the way down
-            for node in self.traverse(prefix):
-                # get the values from the node and combine them into
-                # the result dictionary
-                vals = node.get_values(prefix)
-                values = {**values, **vals}
-        return values
-
-
-    def find_all(self, prefix: str) -> List[PatriciaNode]:
-        """Traverses the trie and returns any nodes it found.
+        With get all values from common prefixes of 'prefix', then traverse all
+        children of 'prefix' to get their values too.
 
         Args:
-            prefix: The prefix to find in the trie, i.e. "192.168.0.0/16"
+            prefix: The prefix to find in the trie.
+            children: Whether to find all child values of the exact node found. (Defaults to False, as this isn't performant in large tries)
 
         Returns:
-            List[PatriciaNode]: Ordered list of nodes found when traversing the trie.
+            List[Tuple[str, Any]]: list of tuples of prefixes and values, i.e. [("192.168.0.0/16", 2856), ...]
 
         Raises:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
-
-        v6 = is_v6(prefix)
-        if v6 and not self.v6:
-            raise ValueError("Trying to find IPv6 value in IPv4 trie")
-        elif not v6 and self.v6:
-            raise ValueError("Trying to find IPv4 value in IPv6 trie")
-
+        self.validate_ip_type_for_trie(prefix)
+        result = []
         ip, _ = cidr_atoi(prefix)
-        nodes = []
+        
+        # for each node on the way down
+        last_node = None
         for node in self.traverse(prefix):
-            # if the node's IP fits within the given network, add it to the result
-            if node.ip == (ip & get_subnet_mask(node.mask, v6)) and node.value is not None:
-                nodes.append(node)
+            result += node.get_values(prefix)
+            last_node = node
+            if node.ip == ip:
+                break
 
-        return nodes
+        if children and last_node.ip == ip:
+            # for each child node underneath the last found node
+            for node in self.traverse_inorder_from_node(last_node):
+                result += node.get_values(node.get_child_values(prefix))
+
+        return result
 
     def traverse(self, prefix: str) -> PatriciaNode:
         """Traverse the entire trie (from root) using a prefix.
@@ -374,21 +352,18 @@ class PatriciaTrie:
 
         Raises:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
-
         """
-        v6 = is_v6(prefix)
-        if v6 and not self.v6:
-            raise ValueError("Trying to find IPv6 value in IPv4 trie")
-        elif not v6 and self.v6:
-            raise ValueError("Trying to find IPv4 value in IPv6 trie")
-        
+        self.validate_ip_type_for_trie(prefix)
+
         ip, _ = cidr_atoi(prefix)
 
         # look for a leaf
+        last_node = PatriciaNode(bit=-2) # -2 as it has to be lower than the root (-1)
         cur_node = node
-        while cur_node is not None:
+        while last_node.bit < cur_node.bit:
+            last_node = cur_node
             yield cur_node
-            if is_set(cur_node.bit, ip, v6):
+            if is_set(cur_node.bit, ip, False):
                 cur_node = cur_node.right
             else:
                 cur_node = cur_node.left
@@ -418,15 +393,18 @@ class PatriciaTrie:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
+        last_bit = -2 # -2 as it has to be lower than the root (-1)
         cur_node = node
-        while len(stack) > 0 or cur_node is not None:
-            while cur_node is not None:
+        while len(stack) > 0 or last_bit < cur_node.bit:
+            while last_bit < cur_node.bit:
                 stack.append(cur_node)
+                last_bit = cur_node.bit
                 cur_node = cur_node.left
-            
+
             if len(stack) > 0:
                 cur_node = stack.pop()
                 yield cur_node
+                last_bit = cur_node.bit
                 cur_node = cur_node.right
 
     def traverse_preorder(self) -> PatriciaNode:
@@ -454,55 +432,17 @@ class PatriciaTrie:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
         stack = []
+        last_bit = -2 # -2 as it has to be lower than the root (-1)
         cur_node = node
-        while len(stack) > 0 or cur_node is not None:
-            while cur_node is not None:
+        while len(stack) > 0 or last_bit < cur_node.bit:
+            while last_bit < cur_node.bit:
                 stack.append(cur_node)
                 yield cur_node
+                last_bit = cur_node.bit
                 cur_node = cur_node.left
 
             if len(stack) > 0:
                 cur_node = stack.pop()
+                last_bit = cur_node.bit
                 cur_node = cur_node.right
 
-    def traverse_postorder(self) -> PatriciaNode:
-        """Perform a postorder traversal of the trie from a given node.
-
-        Yields:
-            PatriciaNode: The next node in the traversal.
-
-        Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
-        """
-        for node in self.traverse_postorder_from_node(self.root):
-            yield node
-
-    def traverse_postorder_from_node(self, node: PatriciaNode) -> PatriciaNode:
-        """Perform a postorder traversal of the trie from a given node.
-
-        Args:
-            node: The node to traverse from.
-
-        Yields:
-            PatriciaNode: The next node in the traversal.
-
-        Raises:
-            ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
-        """
-        stack = []
-        cur_node = node
-        prev_node = None
-        while len(stack) > 0 or cur_node is not None:
-            while cur_node is not None:
-                stack.append(cur_node)
-                cur_node = cur_node.left
-            
-            while cur_node is None and len(stack) > 0:
-                cur_node = stack[-1]
-                if cur_node.right is None or cur_node.right == prev_node:
-                    yield cur_node
-                    stack.pop()
-                    prev_node = cur_node
-                    cur_node = None
-                else:
-                    cur_node = cur_node.right
