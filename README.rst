@@ -55,16 +55,16 @@ and then retrieving data from both tries.
     trie.insert("33.0.0.0/8", "RIR3")
     trie.insert("64.0.0.0/8", "RIR2")
 
-    # a generator for nodes corresponding to: ['Internet', 'RIR-A', 'another', 'third', 'you']
+    # nodes: ['Internet', 'RIR-A', 'another', 'third', 'you']
     nodes_for_prefix = trie.find_all("32.32.32.32")
 
     # prints "Internet, RIR-A, another, third, you"
     print(', '.join(n.value for n in nodes_for_prefix))
 
-    # generator for nodes: ['Internet', 'totally different']
+    # nodes: ['Internet', 'totally different']
     trie.find_all("192.168.0.1/32")
 
-    # generator for nodes: ['Internet', 'RIR-B']
+    # nodes: ['Internet', 'RIR-B']
     trie.find_all("32.192.0.0/10")
 
     # --- supports IPv6 ---
@@ -76,8 +76,8 @@ and then retrieving data from both tries.
     trie.insert("1234:1001:1920:2000:2020::/96", "A fourth")
     trie.insert("1234:1001:1920::ffff", "A different one")
 
-    # generator for nodes: ['Internet', 'Test', 'Another one', 'A third', 'A fourth']
+    # nodes: ['Internet', 'Test', 'Another one', 'A third', 'A fourth']
     trie.find_all("1234:1001:1920:2000:2020::/128")
 
-    # generator for nodes: ['Internet', 'Test', 'Another one', 'A third', 'A different one']
+    # nodes: ['Internet', 'Test', 'Another one', 'A third', 'A different one']
     trie.find_all("1234:1001:1920::ffff")
