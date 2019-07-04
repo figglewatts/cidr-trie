@@ -35,6 +35,7 @@ class PatriciaNode:
         masks (Dict[int, Any]): The data stored on this node. Maps netmasks to data.
         left (PatriciaNode): The left subtrie of this node. Self pointer if no left node.
         right (PatriciaNode): The right subtrie of this node. Self pointer if no right node.
+        parent (PatriciaNode): The parent node of this node. None if root node.
     """
     def __init__(self, ip: int=0, bit: int=0, masks: Dict[int, Any]={}) -> None:
         self.ip = ip
@@ -42,6 +43,10 @@ class PatriciaNode:
         self.masks = masks
         self.left = self
         self.right = self
+        self.parent = None
+
+    def __str__(self):
+        return f"IP: {self.ip}, Decision bit: {self.bit}"
 
     def get_values(self, prefix: str) -> List[Tuple[str, Any]]:
         """Get values from this node by iterating through netmasks and
@@ -174,7 +179,7 @@ class PatriciaTrie:
         cur_node = self.root
         while last_bit < cur_node.bit:
             last_bit = cur_node.bit
-            if is_set(cur_node.bit, ip, False):
+            if is_set(cur_node.bit, ip, self.v6):
                 cur_node = cur_node.right
             else:
                 cur_node = cur_node.left
@@ -186,15 +191,22 @@ class PatriciaTrie:
 
         # they're different, so find the rightmost bit where they differ
         differ_bit = 0
-        while is_set(differ_bit, cur_node.ip, False) == is_set(differ_bit, ip, False):
+        while is_set(differ_bit, cur_node.ip, self.v6) == is_set(differ_bit, ip, self.v6):
             differ_bit += 1
+
+        # special case: if we're inserting a node below the root, we want to
+        # set the bit to the rightmost set bit, otherwise the bit will be set
+        # to zero, causing other non-subprefix nodes to be inserted below
+        # this node erroneously
+        if differ_bit == 0:
+            differ_bit = (127 if self.v6 else 31) - ffs(ip)
 
         # travel down the trie to that point
         last_node = PatriciaNode(bit=-2) # -2 as it has to be lower than the root (-1)
         cur_node = self.root
         while last_node.bit < cur_node.bit and cur_node.bit <= differ_bit:
             last_node = cur_node
-            if is_set(cur_node.bit, ip, False):
+            if is_set(cur_node.bit, ip, self.v6):
                 cur_node = cur_node.right
             else:
                 cur_node = cur_node.left
@@ -203,16 +215,21 @@ class PatriciaTrie:
         to_insert = PatriciaNode(ip, differ_bit, {mask: data})
 
         # figure out where to put child
-        if is_set(to_insert.bit, cur_node.ip, False):
+        if is_set(to_insert.bit, cur_node.ip, self.v6):
             to_insert.right = cur_node
         else:
             to_insert.left = cur_node
 
+        # set the child's new parent if it isn't pointing back up
+        if cur_node.bit > to_insert.bit:
+            cur_node.parent = to_insert
+
         # figure out which side to insert on
-        if is_set(last_node.bit, ip, False):
+        if is_set(last_node.bit, ip, self.v6):
             last_node.right = to_insert
         else:
             last_node.left = to_insert
+        to_insert.parent = last_node
 
         self.size += 1
         return to_insert
@@ -363,7 +380,7 @@ class PatriciaTrie:
         while last_node.bit < cur_node.bit:
             last_node = cur_node
             yield cur_node
-            if is_set(cur_node.bit, ip, False):
+            if is_set(cur_node.bit, ip, self.v6):
                 cur_node = cur_node.right
             else:
                 cur_node = cur_node.left
