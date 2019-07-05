@@ -338,7 +338,7 @@ class PatriciaTrie:
         if children and last_node.ip == ip:
             # for each child node underneath the last found node
             for node in self.traverse_inorder_from_node(last_node):
-                result += node.get_values(node.get_child_values(prefix))
+                result += node.get_child_values(prefix)
 
         return result
 
