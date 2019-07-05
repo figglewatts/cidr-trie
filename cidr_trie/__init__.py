@@ -72,6 +72,7 @@ class PatriciaNode:
             if m > mask:
                 continue
 
+            # make sure this ip is within the network defined by the mask
             if self.ip == (ip & get_subnet_mask(m, v6)):
                 ip_str = f"{ip_itoa(self.ip, v6)}/{m}"
                 result.append((ip_str, self.masks[m]))
@@ -325,7 +326,7 @@ class PatriciaTrie:
         """
         self.validate_ip_type_for_trie(prefix)
         result = []
-        ip, _ = cidr_atoi(prefix)
+        ip, mask = cidr_atoi(prefix)
         
         # for each node on the way down
         last_node = None
@@ -338,7 +339,13 @@ class PatriciaTrie:
         if children and last_node.ip == ip:
             # for each child node underneath the last found node
             for node in self.traverse_inorder_from_node(last_node):
-                result += node.get_child_values(prefix)
+                # skip the first node, as it's already in the result
+                if node.ip == last_node.ip:
+                    continue
+
+                # make sure this child is within the prefix
+                if (node.ip & get_subnet_mask(mask, self.v6)) == (ip & get_subnet_mask(mask, self.v6)):
+                    result += node.get_child_values(prefix)
 
         return result
 

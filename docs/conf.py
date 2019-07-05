@@ -22,7 +22,7 @@ copyright = '2019, Figglewatts'
 author = 'Figglewatts'
 
 # The full version, including alpha/beta/rc tags
-release = '3.1.1'
+release = '3.1.2'
 
 
 # -- General configuration ---------------------------------------------------
