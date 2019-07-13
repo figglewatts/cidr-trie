@@ -324,6 +324,8 @@ class PatriciaTrie:
         Raises:
             ValueError: When trying to find an IPv4 address in a v6 trie and vice-versa.
         """
+        if self.size == 0:
+            return []
         self.validate_ip_type_for_trie(prefix)
         result = []
         ip, mask = cidr_atoi(prefix)
