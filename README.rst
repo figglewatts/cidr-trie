@@ -8,7 +8,7 @@ Read the documentation `here
 
 Requirements
 ------------
-cidr-trie requires Python 3.6 or above.
+cidr-trie requires Python 3.6 or later.
 
 Installation
 ------------
