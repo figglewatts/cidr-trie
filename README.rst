@@ -6,6 +6,11 @@ Store CIDR IP addresses (both v4 and v6) in a trie for easy lookup.
 Read the documentation `here
 <https://cidr-trie.readthedocs.io/en/latest/>`_.
 
+Requirements
+------------
+cid-trie requires Python 3.6 or later.
+
+
 Installation
 ------------
 
